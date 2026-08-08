@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arcana Chat</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="electron-titlebar" aria-hidden="true"></div>
+  <!-- Layout: left agents/sessions/chat, right tabbed display -->
+  <div class="layout">
+      <div class="left" style="flex:0 0 42%;min-width:360px;max-width:640px;border-right:1px solid #e7e7e7;background:#f5f5f5;display:flex;position:relative;">
+      <div class="sidebar-group">
+        <div id="agents-panel" class="agents-panel">
+          <div class="agents-header">Agents</div>
+          <div id="agents-list"></div>
+        </div>
+        <div id="sidebar" class="sidebar" style="width:240px">
+          <div style="padding:8px"><button id="new-session" class="btn btn-secondary btn-sm" data-i18n="ui.newSession">新会话</button></div>
+          <div id="session-list"></div>
+        </div>
+      </div>
+      <div class="wechat">
+    <header class="chat-header">
+      <div class="title">Arcana</div>
+      <button id="clear-context" data-i18n-title="ui.clearContextTitle" title="清理内部上下文（保留对话历史）" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:4px;opacity:0.5;transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.5'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg></button>
+    </header>
+    <main id="messages" class="chat-body">
+      <div class="msg other">
+        <img class="avatar" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><circle cx='32' cy='32' r='32' fill='%23e5e5e5'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-size='28'>A</text></svg>" alt="bot" />
+        <div class="bubble" data-i18n="ui.welcome">欢迎使用 Arcana，对我说点什么吧～</div>
+      </div>
+    </main>
+    <footer class="composer">
+      <button class="icon" title="更多" data-i18n-title="ui.more">＋</button>
+      <textarea id="input" rows="1" placeholder="发送消息" data-i18n-placeholder="ui.inputPlaceholder"></textarea>
+      <button
+        id="stop"
+        class="btn btn-outline btn-secondary btn-stop"
+        type="button"
+        aria-label="停止"
+        title="停止"
+        data-i18n-title="ui.stop"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <rect x="7" y="7" width="10" height="10" rx="1"></rect>
+        </svg>
+      </button>
+      <button id="send" class="btn btn-primary" data-i18n="ui.send">发送</button>
+    </footer>
+      <div id="more-panel" style="position:absolute;left:8px;right:8px;bottom:66px;background:#fff;border:1px solid #ddd;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.08);padding:10px;display:none;">
+        <div style="font-weight:600;margin-bottom:6px;" data-i18n="ui.advanced.header">高级选项</div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#444;">
+          <input id="fullshell" type="checkbox" />
+          <span data-i18n="ui.advanced.fullshell">允许本次会话完全开放命令行</span>
+        </label>
+        <div style="color:#a00;font-size:12px;margin-top:6px;" data-i18n="ui.advanced.fullshellWarning">高风险：仅在受信环境、确有需要时临时开启。关闭后恢复受限模式。</div>
+        <hr style="margin:10px 0;border:none;border-top:1px dashed #eee;" />
+        <div style="font-weight:600;margin-bottom:6px;" data-i18n="ui.advanced.settingsHeader">设置 / 诊断</div>
+
+        <!-- UI Language selector -->
+        <div style="display:flex;align-items:center;gap:8px;margin:6px 0;">
+          <div style="min-width:90px" data-i18n="ui.language">界面语言</div>
+          <select id="ui-lang">
+            <option value="en" data-i18n="ui.language.en">English</option>
+            <option value="zh-CN" data-i18n="ui.language.zh">简体中文</option>
+          </select>
+        </div>
+
+        <div class="cfg-scope-tabs" aria-label="配置作用域">
+          <button id="cfg-scope-tab-global" class="cfg-scope-tab active" type="button" data-scope="global" data-i18n="ui.advanced.scope.global">全局默认</button>
+          <button id="cfg-scope-tab-agent" class="cfg-scope-tab" type="button" data-scope="agent" data-i18n="ui.advanced.scope.agent">当前 Agent</button>
+        </div>
+
+        <div class="cfg-scope-panels">
+          <div class="cfg-scope-panel" data-cfg-scope="global">
+            <div style="font-size:12px;color:#666;margin-bottom:4px;">全局默认配置</div>
+            <div style="display:grid;grid-template-columns:90px 1fr;gap:6px 8px;align-items:center;font-size:13px;margin-bottom:8px;">
+              <div>Provider</div>
+              <select id="cfg-provider-global">
+                <option value="">(auto)</option>
+                <option value="openai">OpenAI</option>
+                <option value="openai-compatible">OpenAI 兼容接口 (OpenAI-compatible)</option>
+                <option value="azure-openai-responses">Azure OpenAI Responses</option>
+                <option value="openai-codex">OpenAI Codex</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="google">Google AI Studio</option>
+                <option value="google-vertex">Google Vertex AI</option>
+                <option value="google-gemini-cli">Google Gemini CLI</option>
+                <option value="mistral">Mistral</option>
+                <option value="groq">Groq</option>
+                <option value="cerebras">Cerebras</option>
+                <option value="xai">xAI</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="vercel-ai-gateway">Vercel AI Gateway</option>
+                <option value="minimax">MiniMax</option>
+                <option value="github-copilot">GitHub Copilot</option>
+                <option value="antigravity">Antigravity</option>
+                <option value="amazon-bedrock">Amazon Bedrock</option>
+                <option value="moonshot">Moonshot</option>
+                <option value="generic">自定义/Generic</option>
+              </select>
+              <div>Model</div>
+              <input id="cfg-model-global" placeholder="model-id" />
+              <div>Base URL</div>
+              <input id="cfg-base-url-global" placeholder="可选，自定义网关" />
+              <div>API Key</div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input id="cfg-key-global" type="password" placeholder="仅用于更新，不会回显" />
+                <span id="cfg-key-set-global" style="font-size:12px;color:#666;">未设置</span>
+              </div>
+              <div>历史压缩</div>
+              <div>
+                <label style="display:flex;align-items:center;gap:6px;">
+                  <input id="cfg-compress-enabled-global" type="checkbox" />
+                  启用（根据长度自动压缩历史）
+                </label>
+              </div>
+              <div>压缩阈值</div>
+              <input id="cfg-compress-threshold-global" type="number" min="0" placeholder="触发压缩的 token 数" />
+              <div>保留用户轮数</div>
+              <input id="cfg-compress-keep-user-turns-global" type="number" min="0" placeholder="至少保留的最近用户轮数" />
+            </div>
+          </div>
+
+          <div class="cfg-scope-panel" data-cfg-scope="agent" style="display:none;">
+            <div style="font-size:12px;color:#666;margin-bottom:4px;">当前 Agent 覆盖</div>
+            <div style="display:grid;grid-template-columns:90px 1fr;gap:6px 8px;align-items:center;font-size:13px;margin-bottom:8px;">
+              <div>Provider</div>
+              <select id="cfg-provider-agent">
+                <option value="">(inherit global)</option>
+                <option value="openai">OpenAI</option>
+                <option value="openai-compatible">OpenAI 兼容接口 (OpenAI-compatible)</option>
+                <option value="azure-openai-responses">Azure OpenAI Responses</option>
+                <option value="openai-codex">OpenAI Codex</option>
+                <option value="anthropic">Anthropic</option>
+                <option value="google">Google AI Studio</option>
+                <option value="google-vertex">Google Vertex AI</option>
+                <option value="google-gemini-cli">Google Gemini CLI</option>
+                <option value="mistral">Mistral</option>
+                <option value="groq">Groq</option>
+                <option value="cerebras">Cerebras</option>
+                <option value="xai">xAI</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="vercel-ai-gateway">Vercel AI Gateway</option>
+                <option value="minimax">MiniMax</option>
+                <option value="github-copilot">GitHub Copilot</option>
+                <option value="antigravity">Antigravity</option>
+                <option value="amazon-bedrock">Amazon Bedrock</option>
+                <option value="moonshot">Moonshot</option>
+                <option value="generic">自定义/Generic</option>
+              </select>
+              <div>Model</div>
+              <input id="cfg-model-agent" placeholder="留空则使用全局默认" />
+              <div>Base URL</div>
+              <input id="cfg-base-url-agent" placeholder="留空则使用全局默认" />
+              <div>API Key</div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input id="cfg-key-agent" type="password" placeholder="仅用于更新，不会回显" />
+                <span id="cfg-key-set-agent" style="font-size:12px;color:#666;">未设置</span>
+              </div>
+              <div>历史压缩</div>
+              <div>
+                <label style="display:flex;align-items:center;gap:6px;">
+                  <input id="cfg-compress-enabled-agent" type="checkbox" />
+                  启用（为当前 Agent 历史压缩）
+                </label>
+              </div>
+              <div>压缩阈值</div>
+              <input id="cfg-compress-threshold-agent" type="number" min="0" placeholder="留空则继承全局" />
+              <div>保留用户轮数</div>
+              <input id="cfg-compress-keep-user-turns-agent" type="number" min="0" placeholder="留空则继承全局" />
+            </div>
+          </div>
+        </div>
+
+        <div class="cfg-effective-card">
+          <div class="cfg-effective-title">生效配置</div>
+          <div class="cfg-effective-grid">
+            <div class="cfg-effective-label">Provider</div>
+            <div id="cfg-effective-provider" class="cfg-effective-value">(auto)</div>
+            <div class="cfg-effective-label">Model</div>
+            <div id="cfg-effective-model" class="cfg-effective-value">—</div>
+            <div class="cfg-effective-label">Base URL</div>
+            <div id="cfg-effective-base-url" class="cfg-effective-value">—</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;">
+          <button id="cfg-save-global" class="btn btn-primary btn-sm cfg-scope-global-only">保存全局</button>
+          <button id="cfg-save-agent" class="btn btn-primary btn-sm cfg-scope-agent-only">保存 Agent</button>
+          <button id="cfg-clear-agent" class="btn btn-danger btn-outline btn-sm cfg-scope-agent-only">清除 Agent 覆盖</button>
+          <button id="cfg-run-doctor" class="btn btn-secondary btn-sm">运行诊断</button>
+          <button id="cfg-support-bundle" class="btn btn-secondary btn-sm">导出支持包</button>
+          <button id="cfg-secrets" class="btn btn-secondary btn-sm" title="管理加密密钥（API Key 等敏感信息）">密钥箱</button>
+          <span id="support-link" style="margin-left:auto;font-size:12px;"></span>
+        </div>
+      </div>
+      </div>
+    </div>
+    <div class="right" style="flex:1;display:flex;flex-direction:column;min-width:0;background:#fff;">
+      <div class="display" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+        <div class="tabs-bar" id="tabs-bar" style="display:flex;gap:4px;padding:8px;background:#fafafa;border-bottom:1px solid #e7e7e7;position:sticky;top:0;z-index:2;flex-wrap:wrap;">
+          <button class="tab active" data-tab="main">主Agent</button>
+          <button class="tab" data-tab="tools">工具</button>
+          <button class="tab" data-tab="details">详情</button>
+          <button class="tab" data-tab="principles">原则</button>
+        </div>
+	        <div class="tabs-views" id="tabs-views" style="flex:1;overflow:auto;background:#fff;">
+	          <section id="logs-main" class="logs">
+	            <div class="logs-main">
+              <section class="main-live-info live-info">
+                <div class="li-item"><span class="li-label">模型</span><span id="li-model" class="li-value">—</span></div>
+                <div class="li-item"><span class="li-label">工作区</span><span id="li-workspace" class="li-value">—</span></div>
+                <div class="li-item"><span class="li-label">本轮使用</span><span id="li-tools-used" class="li-value">—</span></div>
+                <div class="li-item"><span class="li-label">会话token</span><span id="li-session-tokens" class="li-value">—</span></div>
+              </section>
+              <section class="main-skills">
+                <div class="main-skills-header">
+                  <div class="main-skills-title">技能配置</div>
+                  <div id="skills-status" class="main-skills-status"></div>
+                </div>
+                <div id="skills-config" class="main-skills-list"></div>
+                <div class="main-skills-actions">
+                  <button id="skills-save" class="btn btn-primary btn-sm" type="button">保存技能配置</button>
+                  <div class="main-skills-hint">取消勾选=禁用该技能</div>
+                </div>
+              </section>
+	              <section class="main-system">
+	                <div class="main-system-header">系统信息</div>
+	                <div id="logs-main-sys" class="main-system-logs"></div>
+	              </section>
+	            </div>
+	          </section>
+	          <section id="logs-tools" class="logs logs-tools" style="display:none">
+	            <div class="tools-actions">
+	              <div class="tools-actions-header">Actions</div>
+	              <div id="tools-actions-list" class="tools-actions-list"></div>
+	            </div>
+	          </section>
+	          <section id="logs-details" class="logs logs-details" style="display:none">
+	            <div class="tools-details">
+	              <div class="tools-details-header">
+	                <div id="tools-details-title" class="tools-details-title">No action selected</div>
+                <div id="tools-details-meta" class="tools-details-meta"></div>
+                <button id="fetch-tool-output" class="btn btn-secondary btn-xs" type="button">Fetch tool output</button>
+                <button id="toggle-tool-stream" class="btn btn-secondary btn-xs" type="button">实时工具输出: 关</button>
+	              </div>
+	              <details class="tools-details-args-wrap" open>
+	                <summary>参数</summary>
+	                <pre id="tools-details-args" class="tools-details-args"></pre>
+	              </details>
+	              <pre id="tools-details-body" class="tools-details-body">When tools run, their live output will appear here.</pre>
+	            </div>
+	          </section>
+          <section id="logs-principles" class="logs" style="display:none;padding:14px;">
+            <div style="margin-bottom:16px;">
+              <div style="font-weight:700;font-size:15px;margin-bottom:4px;">全局原则</div>
+              <div style="font-size:12px;color:#888;margin-bottom:8px;">对所有会话生效。支持 Markdown、纯文本。可拖拽上传 .txt / .md 文件。</div>
+              <textarea id="principles-global" style="width:100%;height:160px;font-size:13px;font-family:monospace;border:1px solid #ddd;border-radius:8px;padding:10px;resize:vertical;" placeholder="在此编写全局原则..."></textarea>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+                <button id="principles-global-save" class="btn btn-primary btn-sm" onclick="(async()=>{const c=document.getElementById('principles-global').value;const r=await fetch('/api/principles/global',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({agentId:window.__arcana_currentAgentId||'default',content:c})});const d=await r.json();alert(d.ok?'全局原则已保存':'保存失败: '+(d.error||''))})()">保存全局原则</button>
+                <input type="file" id="principles-global-file" accept=".txt,.md,.text,.markdown" style="display:none;" />
+                <button id="principles-global-upload" class="btn btn-ghost btn-sm" style="font-size:12px;" onclick="document.getElementById('principles-global-file').click()">📎 上传文件</button>
+              </div>
+            </div>
+            <div style="border-top:1px solid #e7e7e7;padding-top:16px;">
+              <div style="font-weight:700;font-size:15px;margin-bottom:4px;">当前对话原则</div>
+              <div style="font-size:12px;color:#888;margin-bottom:8px;">仅对当前会话生效。切换会话后不可见。支持 Markdown、纯文本。</div>
+              <textarea id="principles-session" style="width:100%;height:140px;font-size:13px;font-family:monospace;border:1px solid #ddd;border-radius:8px;padding:10px;resize:vertical;" placeholder="在此编写当前对话原则..."></textarea>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+                <button id="principles-session-save" class="btn btn-primary btn-sm" onclick="(async()=>{const sid=window.__arcana_currentSessionId||'';if(!sid){alert('请先发送一条消息创建会话');return;}const c=document.getElementById('principles-session').value;const r=await fetch('/api/principles/session',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({agentId:window.__arcana_currentAgentId||'default',sessionId:sid,content:c})});const d=await r.json();alert(d.ok?'对话原则已保存 (会话:'+sid.slice(0,12)+'...)':'保存失败: '+(d.error||'未知错误'))})()">保存对话原则</button>
+                <input type="file" id="principles-session-file" accept=".txt,.md,.text,.markdown" style="display:none;" />
+                <button id="principles-session-upload" class="btn btn-ghost btn-sm" style="font-size:12px;" onclick="document.getElementById('principles-session-file').click()">📎 上传文件</button>
+                <button id="principles-session-clear" class="btn btn-ghost btn-sm" style="font-size:12px;color:#d63031;" onclick="(async()=>{const sid=window.__arcana_currentSessionId||'';if(!sid)return;const r=await fetch('/api/principles/session',{method:'DELETE',headers:{'content-type':'application/json'},body:JSON.stringify({agentId:window.__arcana_currentAgentId||'default',sessionId:sid})});document.getElementById('principles-session').value='';alert('已清除')})()">清除</button>
+              </div>
+            </div>
+          </section>
+	        </div>
+      </div>
+    </div>
+  </div>
+  <script src='i18n.js'></script>
+  <script>
+// Principles panel init
+(function(){
+  function readFile(file, target){
+    var ext = (file.name||'').toLowerCase().split('.').pop();
+    if (['txt','md','text','markdown'].indexOf(ext) === -1){ alert('仅支持 .txt / .md 文件'); return; }
+    var reader = new FileReader();
+    reader.onload = function(){ target.value = target.value ? target.value + '\n\n' + reader.result : reader.result; };
+    reader.readAsText(file);
+  }
+  function setupDrop(textareaId, fileInputId){
+    var ta = document.getElementById(textareaId);
+    if (!ta) return;
+    ta.addEventListener('dragover', function(e){ e.preventDefault(); });
+    ta.addEventListener('drop', function(e){ e.preventDefault(); var f = e.dataTransfer.files[0]; if (f) readFile(f, ta); });
+    var fi = document.getElementById(fileInputId);
+    if (fi) fi.addEventListener('change', function(){ var f = fi.files[0]; if (f) readFile(f, ta); });
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    setupDrop('principles-global', 'principles-global-file');
+    setupDrop('principles-session', 'principles-session-file');
+    // Load principles when tab clicked
+    var tab = document.querySelector('[data-tab="principles"]');
+    if (tab) tab.addEventListener('click', function(){
+      setTimeout(async function(){
+        try {
+          var sid = window.__arcana_currentSessionId || '';
+          var aid = window.__arcana_currentAgentId || 'default';
+          var r = await fetch('/api/principles?agentId='+encodeURIComponent(aid)+'&sessionId='+encodeURIComponent(sid));
+          var d = await r.json();
+          if (d.ok !== false){
+            var ge = document.getElementById('principles-global');
+            var se = document.getElementById('principles-session');
+            if (ge && d.global) ge.value = d.global;
+            if (se && d.session) se.value = d.session;
+          }
+        } catch(e){}
+      }, 200);
+    });
+  });
+})();
+  </script>
+  <script src='app.js'></script>
+</body>
+</html>
